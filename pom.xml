@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.jagrosh</groupId>
     <artifactId>JMusicBot</artifactId>
-    <version>0.4.3.7</version>
+    <version>0.4.3.7h3</version>
     <packaging>jar</packaging>
 
     <repositories>
@@ -31,9 +31,9 @@
             <url>https://m2.duncte123.dev/releases</url>
         </repository>
         <repository>
-            <id>arbjergDev</id>
+            <id>arbjergDevSnapshot</id>
             <name>Lavalink Repository</name>
-            <url>https://maven.lavalink.dev/releases</url>
+            <url>https://maven.lavalink.dev/snapshots</url>
         </repository>
     </repositories>
 
@@ -64,7 +64,12 @@
         <dependency>
             <groupId>dev.lavalink.youtube</groupId>
             <artifactId>v2</artifactId>
-            <version>1.13.0</version>
+            <version>b4f2c98ce72ff7fc2affa449456d47757352f5a5-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.sqikerz.youtube-source</groupId>
+            <artifactId>common</artifactId>
+            <version>234d46aae2</version>
         </dependency>
         <dependency>
             <groupId>com.github.jagrosh</groupId>
@@ -110,45 +115,45 @@
     </dependencies>
 
     <build>
-      <plugins>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-shade-plugin</artifactId>
-            <version>3.2.0</version>
-            <executions>
-                <execution>
-                    <phase>package</phase>
-                    <goals>
-                        <goal>shade</goal>
-                    </goals>
-                    <configuration>
-                        <shadedArtifactAttached>true</shadedArtifactAttached>
-                        <shadedClassifierName>All</shadedClassifierName>
-                        <artifactSet>
-                            <includes>
-                                <include>*:*</include>
-                            </includes>
-                        </artifactSet>
-                        <transformers>
-                            <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                <resource>reference.conf</resource>
-                            </transformer>
-                            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                <manifestEntries>
-                                    <Main-Class>com.jagrosh.jmusicbot.JMusicBot</Main-Class>
-                                    <Specification-Title>${project.artifactId}</Specification-Title>
-                                    <Specification-Version>${project.version}</Specification-Version>
-                                    <Implementation-Title>${project.artifactId}</Implementation-Title>
-                                    <Implementation-Version>${project.version}</Implementation-Version>
-                                    <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
-                                </manifestEntries>
-                            </transformer>
-                        </transformers>
-                    </configuration>
-                </execution>
-            </executions>
-        </plugin>
-      </plugins>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>All</shadedClassifierName>
+                            <artifactSet>
+                                <includes>
+                                    <include>*:*</include>
+                                </includes>
+                            </artifactSet>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>reference.conf</resource>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <manifestEntries>
+                                        <Main-Class>com.jagrosh.jmusicbot.JMusicBot</Main-Class>
+                                        <Specification-Title>${project.artifactId}</Specification-Title>
+                                        <Specification-Version>${project.version}</Specification-Version>
+                                        <Implementation-Title>${project.artifactId}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                        <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
+                                    </manifestEntries>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <properties>
