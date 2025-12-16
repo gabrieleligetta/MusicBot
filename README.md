@@ -1,4 +1,4 @@
-## Unofficial JMusicBot update (Forked from: https://github.com/jagrosh/MusicBot, with @MichailiK commits)
+## Unofficial JMusicBot update with built-in Docker script (Forked from: https://github.com/jagrosh/MusicBot)
 
 > [!IMPORTANT]
 > This version has a built-in Docker script ([youtube-trusted-session-generator](https://github.com/iv-org/youtube-trusted-session-generator)) that enters po_token and visitor_data automatically into the _tokens.txt_ (file creates with first launch) file each time the bot is launched. 
