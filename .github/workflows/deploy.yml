@@ -85,4 +85,4 @@ jobs:
             echo "🧹 Pulizia..."
             docker image prune -f
             
-            echo "✅ Deploy Completato con Successo!"
+            echo "✅ Deploy Completato con Successo!"?

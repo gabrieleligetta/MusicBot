@@ -1,5 +1,5 @@
 const { EmbedBuilder, version: djsVersion } = require('discord.js');
-const packageJson = require('../../package.json');
+const packageJson = require('../../../package.json');
 
 module.exports = {
     data: {
