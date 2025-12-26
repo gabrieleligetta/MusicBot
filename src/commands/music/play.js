@@ -9,7 +9,7 @@ const { exec } = require('child_process');
 // Helper function to get video info using yt-dlp
 const getVideoInfo = (url) => {
     return new Promise((resolve, reject) => {
-        let command = 'yt-dlp --dump-json --no-playlist --quiet';
+        let command = 'yt-dlp --dump-json --no-playlist --quiet --remote-components ejs:github';
         
         // --- INTEGRATION PATCH START ---
         // Inject the POT Provider Configuration

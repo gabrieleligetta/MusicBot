@@ -47,3 +47,8 @@ services:
       - ./Playlists:/usr/src/app/Playlists
       # Persistenza dei cookie (opzionale)
       - ./cookies.json:/usr/src/app/cookies.json
+      # AGGIUNGI QUESTA RIGA: Salva la cache di yt-dlp per non riscaricarla sempre
+      - yt-dlp-cache:/root/.cache/yt-dlp
+
+volumes:
+  yt-dlp-cache:
