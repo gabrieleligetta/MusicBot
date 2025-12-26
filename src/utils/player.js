@@ -120,6 +120,8 @@ module.exports = {
                 '-f', 'bestaudio',
                 '--no-playlist',
                 '--limit-rate', '100K',
+                // Abilita il download dei componenti per risolvere la challenge di YouTube
+                '--remote-components', 'ejs:github',
                 // --- INTEGRATION PATCH START ---
                 // Inject the POT Provider Configuration
                 // We use the Modern Syntax (youtubepot-bgutilhttp)
