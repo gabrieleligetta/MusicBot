@@ -1,41 +1,88 @@
-deploy:
-  needs: build-and-push
-  runs-on: ubuntu-latest
+name: Build & Deploy to Google Cloud
 
-  steps:
-    - name: 🚀 Deploy via SSH
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        # Rimuoviamo 'envs' perché iniettiamo i valori direttamente nello script sotto
-        script: |
-          set -e
-          
-          echo "📂 Entro nella cartella del progetto..."
-          cd ~/musicbot-docker
-          
-          # 1. Aggiorna il file docker-compose.yml
-          echo "⬇️ Aggiorno repository..."
-          git pull origin master
-          
-          # 2. Login a GitHub Container Registry
-          # MODIFICA FONDAMENTALE: Usiamo ${{ secrets.CR_PAT }} direttamente qui
-          echo "🔐 Eseguo Login al Registry..."
-          echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "gabrieleligetta" --password-stdin
-          
-          # 3. Scarica la nuova immagine costruita da GitHub
-          echo "⬇️ Scarico la nuova immagine..."
-          docker compose pull
-          
-          # 4. Riavvia i container
-          echo "🔄 Riavvio i container..."
-          docker compose up -d
-          
-          # 5. Pulizia immagini vecchie
-          echo "🧹 Pulizia..."
-          docker image prune -f
-          
-          echo "✅ Deploy Completato con Successo!"
+on:
+  workflow_dispatch: # Avvio manuale per risparmiare runner
+
+env:
+  REGISTRY: ghcr.io
+  # Usa il nome del repo corrente (es. gabrieleligetta/musicbot)
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # JOB 1: COSTRUISCI L'IMMAGINE E CARICALA SU GITHUB
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐳 Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+
+      - name: 🏗️ Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # JOB 2: COLLEGATI AL SERVER E SCARICA L'AGGIORNAMENTO
+  # JOB 2: COLLEGATI AL SERVER E SCARICA L'AGGIORNAMENTO
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚀 Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          # Rimuoviamo 'envs' perché iniettiamo i valori direttamente nello script sotto
+          script: |
+            set -e
+            
+            echo "📂 Entro nella cartella del progetto..."
+            cd ~/musicbot-docker
+            
+            # 1. Aggiorna il file docker-compose.yml
+            echo "⬇️ Aggiorno repository..."
+            git pull origin master
+            
+            # 2. Login a GitHub Container Registry
+            # MODIFICA FONDAMENTALE: Usiamo ${{ secrets.CR_PAT }} direttamente qui
+            echo "🔐 Eseguo Login al Registry..."
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "gabrieleligetta" --password-stdin
+            
+            # 3. Scarica la nuova immagine costruita da GitHub
+            echo "⬇️ Scarico la nuova immagine..."
+            docker compose pull
+            
+            # 4. Riavvia i container
+            echo "🔄 Riavvio i container..."
+            docker compose up -d
+            
+            # 5. Pulizia immagini vecchie
+            echo "🧹 Pulizia..."
+            docker image prune -f
+            
+            echo "✅ Deploy Completato con Successo!"
