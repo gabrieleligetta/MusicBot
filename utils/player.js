@@ -5,6 +5,40 @@ const logger = require('./logger');
 
 const queues = new Map();
 
+// Helper to parse shell-like arguments string into array
+function parseArgs(str) {
+    if (!str) return [];
+    const args = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        if (inQuote) {
+            if (char === quoteChar) {
+                inQuote = false;
+            } else {
+                current += char;
+            }
+        } else {
+            if (char === '"' || char === "'") {
+                inQuote = true;
+                quoteChar = char;
+            } else if (char === ' ') {
+                if (current.length > 0) {
+                    args.push(current);
+                    current = '';
+                }
+            } else {
+                current += char;
+            }
+        }
+    }
+    if (current.length > 0) args.push(current);
+    return args;
+}
+
 module.exports = {
     getQueue: (guildId) => queues.get(guildId),
     createQueue: (guildId) => {
@@ -85,6 +119,13 @@ module.exports = {
                 '--no-playlist',
                 '--limit-rate', '100K'
             ];
+
+            // Inject environment options (e.g. for PO Token plugin)
+            if (process.env.YTDL_OPTIONS) {
+                const extraArgs = parseArgs(process.env.YTDL_OPTIONS);
+                args.push(...extraArgs);
+                logger.info(`[Player] Injected YTDL_OPTIONS: ${process.env.YTDL_OPTIONS}`);
+            }
 
             // Check for cookies.json
             if (fs.existsSync('./cookies.json')) {

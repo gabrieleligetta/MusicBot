@@ -1,12 +1,55 @@
-version: '3.8'
+version: '3.9'
 
 services:
+  # ---------------------------------------------------------------------------
+  # SERVIZIO 1: Sidecar PO Token Provider (Implementazione Rust)
+  # Repository: jim60105/bgutil-ytdlp-pot-provider-rs
+  # Registry: GHCR (GitHub Container Registry)
+  # ---------------------------------------------------------------------------
+  bgutil-sidecar:
+    image: ghcr.io/jim60105/bgutil-pot:latest
+    # Forza l'architettura AMD64 per compatibilità con Apple Silicon (via Rosetta)
+    platform: linux/amd64
+    container_name: bgutil-sidecar
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info       # Livello di log per debug
+      - SERVER_PORT=4416    # Porta di ascolto standard per l'API
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4416/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Esposizione porte opzionale per debug dall'host, non necessaria per il bot
+    # ports:
+    #   - "4416:4416"
+
+  # ---------------------------------------------------------------------------
+  # SERVIZIO 2: MusicBot (Target Application)
+  # ---------------------------------------------------------------------------
   musicbot:
     container_name: musicbot
     build: .
     restart: unless-stopped
+    
+    # CRITICO: Condivisione del namespace di rete con il sidecar.
+    # Questo permette al bot di raggiungere il provider su 'localhost'.
+    network_mode: service:bgutil-sidecar
+    
+    depends_on:
+      bgutil-sidecar:
+        condition: service_healthy
+        
     env_file:
       - .env
+      
+    environment:
+      # Iniezione degli argomenti yt-dlp per utilizzare il plugin.
+      # Configurazione per usare il provider locale (sidecar)
+      - YTDL_OPTIONS=--extractor-args "youtube:player_client=default,mweb;po_token=web+http://127.0.0.1:4416/get_pot"
+      
     volumes:
       - ./database.sqlite:/usr/src/app/database.sqlite
       - ./Playlists:/usr/src/app/Playlists
+      # Se necessario persistere i cookie
+      - ./cookies.json:/usr/src/app/cookies.json

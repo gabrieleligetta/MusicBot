@@ -11,6 +11,11 @@ const getVideoInfo = (url) => {
     return new Promise((resolve, reject) => {
         let command = 'yt-dlp --dump-json --no-playlist --quiet';
         
+        // Inject environment options (e.g. for PO Token plugin)
+        if (process.env.YTDL_OPTIONS) {
+            command += ` ${process.env.YTDL_OPTIONS}`;
+        }
+
         if (fs.existsSync('./cookies.json')) {
             command += ' --cookies ./cookies.json';
         }
