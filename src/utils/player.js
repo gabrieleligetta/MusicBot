@@ -161,7 +161,10 @@ module.exports = {
             
             const resource = createAudioResource(ytDlpProcess.stdout, {
                 inputType: StreamType.Arbitrary,
-                inlineVolume: true
+                inlineVolume: true,
+                // Aumenta il buffer a 1MB (default è molto basso, circa 64kb)
+                // Questo aiuta a prevenire i salti se la CPU o la rete hanno un picco
+                highWaterMark: 1 << 20
             });
             logger.info(`[Player] Audio resource created`);
 
