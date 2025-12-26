@@ -75,14 +75,14 @@ jobs:
             
             # 3. Scarica la nuova immagine costruita da GitHub
             echo "⬇️ Scarico la nuova immagine..."
-            docker compose pull
+            docker compose -f docker-compose.prod.yml pull
             
             # 4. Riavvia i container
             echo "🔄 Riavvio i container..."
-            docker compose up -d
+            docker compose -f docker-compose.prod.yml up -d
             
             # 5. Pulizia immagini vecchie
             echo "🧹 Pulizia..."
             docker image prune -f
             
-            echo "✅ Deploy Completato con Successo!"?
+            echo "✅ Deploy Completato con Successo!"

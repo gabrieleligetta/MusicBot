@@ -1,4 +1,3 @@
-version: '3.9'
 
 services:
   # ---------------------------------------------------------------------------
@@ -22,9 +21,7 @@ services:
   # ---------------------------------------------------------------------------
   musicbot:
     container_name: musicbot
-    build: 
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/gabrieleligetta/musicbot:latest
     restart: always
     
     # CRITICO: Condivisione del namespace di rete con il sidecar.
