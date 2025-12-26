@@ -2,37 +2,41 @@ version: '3.9'
 
 services:
   # ---------------------------------------------------------------------------
-  # SERVIZIO 1: Sidecar Rust
+  # SERVIZIO 1: POT Token Provider (Server)
   # ---------------------------------------------------------------------------
-  bgutil-sidecar:
-    image: ghcr.io/jim60105/bgutil-pot:latest
-    container_name: bgutil-sidecar
-    restart: unless-stopped
+  pot-provider:
+    image: ghcr.io/jim60105/yt-dlp:pot
+    container_name: yt-dlp-pot-provider
+    restart: always
+    # CRITICAL: Override the default entrypoint to run the bgutil server
+    # We bind to 0.0.0.0 to allow access from other containers
+    entrypoint: ["bgutil-pot", "server", "--bind", "0.0.0.0:4444"]
+    ports:
+      - "4444:4444"
     environment:
       - RUST_LOG=info
-      - SERVER_PORT=4416
+    networks:
+      - musicbot_network
 
   # ---------------------------------------------------------------------------
-  # SERVIZIO 2: MusicBot (SCARICATO DA GHCR)
+  # SERVIZIO 2: MusicBot
   # ---------------------------------------------------------------------------
   musicbot:
     container_name: musicbot
-    #  vvvvvvvvv MODIFICA IMPORTANTE vvvvvvvvv
-    # Sostituisci 'gabrieleligetta' col tuo username GitHub esatto (tutto minuscolo)
+    # Usa l'immagine costruita localmente o da GHCR, ma assicurati che abbia le dipendenze pip aggiornate
     image: ghcr.io/gabrieleligetta/musicbot:latest
-    #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    # RIMUOVI LA RIGA: build: .
     restart: unless-stopped
-    
-    network_mode: service:bgutil-sidecar
     depends_on:
-      - bgutil-sidecar
-        
+      - pot-provider
     env_file:
       - .env
-    environment:
-      - YTDL_OPTIONS=--extractor-args "youtube:player_client=default,mweb;po_token=web+http://127.0.0.1:4416/get_pot"
     volumes:
       - ./database.sqlite:/usr/src/app/database.sqlite
       - ./Playlists:/usr/src/app/Playlists
       - ./cookies.json:/usr/src/app/cookies.json
+    networks:
+      - musicbot_network
+
+networks:
+  musicbot_network:
+    driver: bridge

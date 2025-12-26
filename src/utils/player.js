@@ -117,7 +117,12 @@ module.exports = {
                 '-q',
                 '-f', 'bestaudio',
                 '--no-playlist',
-                '--limit-rate', '100K'
+                '--limit-rate', '100K',
+                // --- INTEGRATION PATCH START ---
+                // Inject the POT Provider Configuration
+                // We use the Modern Syntax (youtubepot-bgutilhttp)
+                '--extractor-args', 'youtubepot-bgutilhttp:base_url=http://pot-provider:4444'
+                // --- INTEGRATION PATCH END ---
             ];
 
             // Inject environment options (e.g. for PO Token plugin)

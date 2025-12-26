@@ -11,6 +11,12 @@ const getVideoInfo = (url) => {
     return new Promise((resolve, reject) => {
         let command = 'yt-dlp --dump-json --no-playlist --quiet';
         
+        // --- INTEGRATION PATCH START ---
+        // Inject the POT Provider Configuration
+        // We use the Modern Syntax (youtubepot-bgutilhttp)
+        command += ' --extractor-args "youtubepot-bgutilhttp:base_url=http://pot-provider:4444"';
+        // --- INTEGRATION PATCH END ---
+
         // Inject environment options (e.g. for PO Token plugin)
         if (process.env.YTDL_OPTIONS) {
             command += ` ${process.env.YTDL_OPTIONS}`;

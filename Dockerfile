@@ -27,7 +27,7 @@ FROM node:22-bookworm-slim AS runner
 
 WORKDIR /usr/src/app
 
-# Installazione dipendenze runtime
+# Installazione dipendenze runtime e Python/Pip per yt-dlp
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
@@ -36,15 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# --- MODIFICA CHIAVE PER ALLINEAMENTO RUST ---
-# Invece di scaricare yt-dlp e installare un plugin pip incompatibile,
-# copiamo yt-dlp direttamente dall'immagine ufficiale del progetto Rust (jim60105).
-# Questa versione include già il supporto nativo per il sidecar Rust.
-COPY --from=ghcr.io/jim60105/yt-dlp:pot /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp
-
-# Assicuriamo i permessi di esecuzione
-RUN chmod a+rx /usr/local/bin/yt-dlp
-# -------------------------------------------------------------
+# Installazione yt-dlp e plugin provider
+# Usiamo --break-system-packages perché siamo in un container isolato
+RUN pip3 install --no-cache-dir --break-system-packages --upgrade yt-dlp \
+    && pip3 install --no-cache-dir --break-system-packages bgutil-ytdlp-pot-provider
 
 # Copia file dal builder
 COPY --from=builder /usr/src/app/node_modules ./node_modules
