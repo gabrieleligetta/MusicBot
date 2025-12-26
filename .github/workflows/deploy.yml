@@ -1,0 +1,44 @@
+name: Deploy to Google Cloud
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Deploy via SSH
+        uses: appleboy/ssh-action@master
+        env:
+          BOT_ENV: ${{ secrets.SSH_ENV }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          envs: BOT_ENV
+          script: |
+            set -e
+            
+            # Vai nella cartella
+            cd ~/musicbot-docker
+            
+            # Crea/Aggiorna il file .env dal secret
+            echo "📝 Updating .env file..."
+            echo "$BOT_ENV" > .env
+            
+            # Scarica le modifiche
+            echo "⬇️ Pulling latest changes..."
+            git pull origin master
+            
+            # Ricostruisci e riavvia i container usando il file di produzione
+            echo "🔄 Rebuilding containers..."
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d --build
+            
+            # Pulisci le immagini vecchie
+            echo "🧹 Cleaning up..."
+            docker image prune -f
+            
+            echo "✅ Deploy Success!"

@@ -61,7 +61,7 @@ RUN yt-dlp --version
 # Copia file dal builder
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package.json ./package.json
-COPY --from=builder /usr/src/app/src ./src
+# Rimosso COPY src perché contiene solo codice Java
 COPY --from=builder /usr/src/app/index.js ./
 COPY --from=builder /usr/src/app/utils ./utils
 COPY --from=builder /usr/src/app/commands ./commands

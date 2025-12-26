@@ -6,3 +6,4 @@
 nb*.xml
 .idea
 node_modules/
+.env
