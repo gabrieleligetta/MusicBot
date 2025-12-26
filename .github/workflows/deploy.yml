@@ -79,7 +79,7 @@ jobs:
             
             # 2. Login a GitHub Container Registry
             echo "Logging in to ghcr.io..."
-            echo "$CR_PAT" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            echo "$CR_PAT" | docker login ghcr.io -u "gabrieleligetta" --password-stdin
             
             # 3. Scarica la nuova immagine costruita da GitHub
             echo "⬇️ Pulling new image..."
