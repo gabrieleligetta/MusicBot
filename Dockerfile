@@ -27,19 +27,28 @@ FROM node:22-bookworm-slim AS runner
 
 WORKDIR /usr/src/app
 
-# Installazione dipendenze runtime e Python/Pip per yt-dlp
+# 1. Installiamo le dipendenze base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
     python3-pip \
     python3-venv \
     ca-certificates \
+    curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Installazione yt-dlp e plugin provider
-# Usiamo --break-system-packages perché siamo in un container isolato
-RUN pip3 install --no-cache-dir --break-system-packages --upgrade yt-dlp \
-    && pip3 install --no-cache-dir --break-system-packages bgutil-ytdlp-pot-provider
+# 2. Installiamo yt-dlp (Core)
+RUN pip3 install --no-cache-dir --break-system-packages --upgrade yt-dlp
+
+# 3. FIX VERSION MISMATCH: Copiamo il plugin client ESATTO dall'immagine del server
+# Questo assicura che il plugin (client) sia compatibile al 100% con il sidecar (server)
+COPY --from=ghcr.io/jim60105/bgutil-pot:latest /client /etc/yt-dlp-plugins/bgutil-ytdlp-pot-provider
+
+# 4. FIX JS RUNTIME: Installiamo Deno
+# yt-dlp ora richiede un motore JS. Node c'è, ma Deno è quello supportato nativamente
+# e non richiede configurazioni aggiuntive nel codice del bot.
+COPY --from=denoland/deno:bin /deno /usr/bin/deno
 
 # Copia file dal builder
 COPY --from=builder /usr/src/app/node_modules ./node_modules
