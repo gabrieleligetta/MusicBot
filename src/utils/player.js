@@ -129,7 +129,10 @@ module.exports = {
 
             // Check for cookies.json
             if (fs.existsSync('./cookies.json')) {
-                args.push('--cookies', './cookies.json');
+                const stats = fs.statSync('./cookies.json');
+                if (stats.isFile() && stats.size > 0) {
+                    args.push('--cookies', './cookies.json');
+                }
             }
 
             const ytDlpProcess = spawn('yt-dlp', args);

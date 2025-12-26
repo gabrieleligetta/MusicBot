@@ -1,10 +1,11 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Events, version: djsVersion } = require('discord.js');
 const { generateDependencyReport } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
 const db = require('./utils/db');
 const logger = require('./utils/logger');
+const packageJson = require('../package.json');
 
 // --- DIAGNOSTICA AMBIENTE DOCKER ---
 const sodium = (() => {
@@ -14,7 +15,9 @@ const sodium = (() => {
 const crypto = require('node:crypto');
 
 console.log('--- DIAGNOSTICA AMBIENTE DOCKER ---');
+console.log(`Bot Version: v${packageJson.version}`);
 console.log(`Node Version: ${process.version}`);
+console.log(`Discord.js Version: v${djsVersion}`);
 console.log(`Sodium-Native Caricato: ${sodium ? 'SÌ' : 'NO'}`);
 if (!sodium) console.warn('ATTENZIONE: sodium-native non trovato. XChaCha20 non disponibile.');
 
@@ -65,12 +68,12 @@ for (const folder of commandFolders) {
     }
 }
 
-client.once('ready', () => {
+client.once(Events.ClientReady, () => {
     logger.info(`Logged in as ${client.user.tag}!`);
     logger.info(`Loaded ${client.commands.size} commands.`);
 });
 
-client.on('messageCreate', async message => {
+client.on(Events.MessageCreate, async message => {
     if (message.author.bot) return;
     
     // Recupera impostazioni dal DB

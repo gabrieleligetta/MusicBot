@@ -17,7 +17,10 @@ const getVideoInfo = (url) => {
         }
 
         if (fs.existsSync('./cookies.json')) {
-            command += ' --cookies ./cookies.json';
+            const stats = fs.statSync('./cookies.json');
+            if (stats.isFile() && stats.size > 0) {
+                command += ' --cookies ./cookies.json';
+            }
         }
         
         // Escape double quotes in URL just in case, though usually URLs don't have them
