@@ -24,6 +24,7 @@ COPY package*.json ./
 # Installazione delle dipendenze (compilazione nativa)
 RUN npm install --build-from-source
 
+# Copia tutto il resto (inclusa la nuova cartella src)
 COPY . .
 
 # -----------------------------------------------------------------------------
@@ -61,13 +62,11 @@ RUN yt-dlp --version
 # Copia file dal builder
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package.json ./package.json
-# Rimosso COPY src perché contiene solo codice Java
-COPY --from=builder /usr/src/app/index.js ./
-COPY --from=builder /usr/src/app/utils ./utils
-COPY --from=builder /usr/src/app/commands ./commands
+# Copia la cartella src che ora contiene tutto il codice
+COPY --from=builder /usr/src/app/src ./src
 
 RUN mkdir -p Playlists
 
 ENV NODE_ENV=production
 
-CMD ["node", "index.js"]
+CMD ["node", "src/index.js"]
