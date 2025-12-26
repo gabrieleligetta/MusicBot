@@ -74,10 +74,11 @@
             <artifactId>lavaplayer-ext-youtube-rotator</artifactId>
             <version>2.2.2</version>
         </dependency>
+        <!-- Sostituito dev.lavalink.youtube:v2 con la versione JitPack per avere l'ultima snapshot -->
         <dependency>
-            <groupId>dev.lavalink.youtube</groupId>
+            <groupId>com.github.lavalink-devs.youtube-source</groupId>
             <artifactId>v2</artifactId>
-            <version>1.13.5</version>
+            <version>master-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.github.jagrosh</groupId>

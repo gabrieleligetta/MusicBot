@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+database.sqlite
+.env
+.git
+.gitignore
+Dockerfile
+README.md
+src
+target
+pom.xml
+scripts
