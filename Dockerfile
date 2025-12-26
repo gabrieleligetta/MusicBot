@@ -1,13 +1,10 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Builder
-# Utilizziamo l'immagine completa (non slim) per avere accesso facilitato ai tool
 # -----------------------------------------------------------------------------
 FROM node:22-bookworm AS builder
 
-# Impostiamo la directory di lavoro
 WORKDIR /usr/src/app
 
-# Aggiornamento dei repository e installazione delle dipendenze di build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -20,49 +17,38 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-
-# Installazione delle dipendenze (compilazione nativa)
 RUN npm install --build-from-source
-
-# Copia tutto il resto (inclusa la nuova cartella src)
 COPY . .
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runner (Produzione)
-# Torniamo a Debian Bookworm Slim per garantire compatibilità multi-arch (ARM64/AMD64)
-# L'immagine di Jim causava problemi di architettura su Apple Silicon.
-# Qui replichiamo manualmente l'installazione di yt-dlp e del plugin.
 # -----------------------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
 
 WORKDIR /usr/src/app
 
 # Installazione dipendenze runtime
-# python3-pip e python3-venv sono necessari per installare il plugin in modo pulito
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
     python3-pip \
     python3-venv \
-    wget \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Installazione di yt-dlp (standalone binary)
-RUN wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp
+# --- MODIFICA CHIAVE PER ALLINEAMENTO RUST ---
+# Invece di scaricare yt-dlp e installare un plugin pip incompatibile,
+# copiamo yt-dlp direttamente dall'immagine ufficiale del progetto Rust (jim60105).
+# Questa versione include già il supporto nativo per il sidecar Rust.
+COPY --from=ghcr.io/jim60105/yt-dlp:pot /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp
 
-# Installazione del plugin bgutil-ytdlp-pot-provider
-# Usiamo --break-system-packages su Debian 12 per installare nel sistema globale (accettabile in container)
-RUN pip3 install bgutil-ytdlp-pot-provider --break-system-packages
-
-# Verifica installazione
-RUN yt-dlp --version
+# Assicuriamo i permessi di esecuzione
+RUN chmod a+rx /usr/local/bin/yt-dlp
+# -------------------------------------------------------------
 
 # Copia file dal builder
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package.json ./package.json
-# Copia la cartella src che ora contiene tutto il codice
 COPY --from=builder /usr/src/app/src ./src
 
 RUN mkdir -p Playlists
