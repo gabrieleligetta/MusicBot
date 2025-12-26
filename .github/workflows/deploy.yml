@@ -1,8 +1,7 @@
 name: Build & Deploy to Google Cloud
 
 on:
-  push:
-    branches: [ "master" ] # Assicurati che sia 'master' o 'main'
+  workflow_dispatch: # Avvio manuale per risparmiare runner
 
 env:
   REGISTRY: ghcr.io
@@ -63,13 +62,24 @@ jobs:
           envs: GITHUB_ACTOR,CR_PAT
           script: |
             set -e
+            
+            echo "=== DEBUG INFO ==="
+            echo "GITHUB_ACTOR: '$GITHUB_ACTOR'"
+            if [ -z "$CR_PAT" ]; then
+              echo "CR_PAT is EMPTY or NOT SET"
+            else
+              echo "CR_PAT is SET (length: ${#CR_PAT})"
+            fi
+            echo "=================="
+
             cd ~/musicbot-docker
             
-            # 1. Aggiorna il file docker-compose.yml (per avere la modifica 'image:')
+            # 1. Aggiorna il file docker-compose.yml
             git pull origin master
             
-            # 2. Login a GitHub Container Registry (usando il token segreto)
-            echo "$CR_PAT" | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+            # 2. Login a GitHub Container Registry
+            echo "Logging in to ghcr.io..."
+            echo "$CR_PAT" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             
             # 3. Scarica la nuova immagine costruita da GitHub
             echo "⬇️ Pulling new image..."
