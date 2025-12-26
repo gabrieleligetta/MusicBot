@@ -1,8 +1,35 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { generateDependencyReport } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
 const db = require('./utils/db');
+const logger = require('./utils/logger');
+
+// --- DIAGNOSTICA AMBIENTE DOCKER ---
+const sodium = (() => {
+    try { return require('sodium-native'); }
+    catch (e) { return null; }
+})();
+const crypto = require('node:crypto');
+
+console.log('--- DIAGNOSTICA AMBIENTE DOCKER ---');
+console.log(`Node Version: ${process.version}`);
+console.log(`Sodium-Native Caricato: ${sodium ? 'SÌ' : 'NO'}`);
+if (!sodium) console.warn('ATTENZIONE: sodium-native non trovato. XChaCha20 non disponibile.');
+
+const ciphers = crypto.getCiphers();
+const hasAesGcm = ciphers.includes('aes-256-gcm');
+console.log(`Supporto Node Crypto AES-256-GCM: ${hasAesGcm ? 'SÌ' : 'NO'}`);
+
+if (!sodium && !hasAesGcm) {
+    console.error('CRITICO: Nessuna modalità crittografica supportata disponibile!');
+}
+console.log('-----------------------------------');
+// -----------------------------------
+
+// Stampa report dipendenze vocali per debug all'avvio
+logger.info('Voice Dependency Report:\n' + generateDependencyReport());
 
 const client = new Client({
     intents: [
@@ -32,15 +59,15 @@ for (const folder of commandFolders) {
             if ('data' in command && 'execute' in command) {
                 client.commands.set(command.data.name, command);
             } else {
-                console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+                logger.warn(`The command at ${filePath} is missing a required "data" or "execute" property.`);
             }
         }
     }
 }
 
 client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-    console.log(`Loaded ${client.commands.size} commands.`);
+    logger.info(`Logged in as ${client.user.tag}!`);
+    logger.info(`Loaded ${client.commands.size} commands.`);
 });
 
 client.on('messageCreate', async message => {
@@ -82,7 +109,7 @@ client.on('messageCreate', async message => {
     try {
         await command.execute(message, args);
     } catch (error) {
-        console.error(error);
+        logger.error(`Error executing command ${commandName}`, error);
         await message.reply({ content: 'There was an error while executing this command!', ephemeral: true });
     }
 });

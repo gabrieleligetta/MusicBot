@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const play = require('play-dl');
 
 module.exports = {
     data: {

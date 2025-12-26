@@ -1,8 +1,43 @@
 const { SlashCommandBuilder } = require('discord.js');
-const play = require('play-dl');
+const ytSearch = require('yt-search');
 const player = require('../../utils/player');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../../utils/logger');
+const { exec } = require('child_process');
+
+// Helper function to get video info using yt-dlp
+const getVideoInfo = (url) => {
+    return new Promise((resolve, reject) => {
+        let command = 'yt-dlp --dump-json --no-playlist --quiet';
+        
+        if (fs.existsSync('./cookies.json')) {
+            command += ' --cookies ./cookies.json';
+        }
+        
+        // Escape double quotes in URL just in case, though usually URLs don't have them
+        command += ` "${url.replace(/"/g, '\\"')}"`;
+
+        exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+            if (error) {
+                // logger.error(`[yt-dlp info error] ${stderr}`); // Optional logging
+                reject(error);
+                return;
+            }
+            try {
+                const info = JSON.parse(stdout);
+                resolve(info);
+            } catch (e) {
+                reject(e);
+            }
+        });
+    });
+};
+
+// Basic validation for YouTube URLs
+const isYouTubeURL = (url) => {
+    return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/.test(url);
+};
 
 module.exports = {
     data: {
@@ -21,24 +56,23 @@ module.exports = {
         }
 
         if (!args.length) {
-            // Se non ci sono argomenti, controlliamo se c'è un allegato (file .txt o audio)
-            if (message.attachments.size > 0) {
-                // Gestione file allegati (futuro)
-                return message.reply('Playing from attachments is not supported yet.');
-            }
             return message.reply('You need to provide a song URL, name, or playlist name!');
         }
 
         const query = args.join(' ');
+        logger.info(`[Command: Play] User ${message.author.tag} requested: ${query}`);
+
         let queue = player.getQueue(message.guild.id);
 
         if (!queue) {
+            logger.info(`[Command: Play] Creating new queue for guild ${message.guild.id}`);
             queue = player.createQueue(message.guild.id);
             try {
                 const connection = await player.connectToChannel(message.member.voice.channel);
                 connection.subscribe(queue.player);
                 queue.connection = connection;
             } catch (error) {
+                logger.error(`[Command: Play] Failed to connect to voice channel`, error);
                 player.deleteQueue(message.guild.id);
                 return message.reply('Could not join the voice channel!');
             }
@@ -49,38 +83,33 @@ module.exports = {
         const playlistPath = path.join(process.cwd(), playlistsFolder, `${query}.txt`);
 
         if (fs.existsSync(playlistPath)) {
+            logger.info(`[Command: Play] Loading local playlist: ${query}`);
             await message.reply(`📂 Loading playlist **${query}**...`);
             const content = fs.readFileSync(playlistPath, 'utf-8');
             const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
             
             let addedCount = 0;
-            // Carichiamo le canzoni in background per non bloccare
-            // Nota: play-dl search può essere lento se fatto in serie.
-            // Per ora facciamo un approccio semplice: cerchiamo e aggiungiamo.
             
             for (const line of lines) {
                 try {
-                    // Semplificazione: assumiamo che le righe siano URL o query valide
-                    // Per ottimizzare, potremmo parallelizzare o usare una coda di caricamento
-                    // Ma per ora facciamo sequenziale per stabilità
-                    
                     let songData = null;
-                    if (play.yt_validate(line) === 'video') {
-                         const info = await play.video_info(line);
+                    if (isYouTubeURL(line)) {
+                         const info = await getVideoInfo(line);
                          songData = {
-                             title: info.video_details.title,
-                             url: info.video_details.url,
-                             duration: info.video_details.durationInSec,
-                             thumbnail: info.video_details.thumbnails[0].url
+                             title: info.title,
+                             url: info.webpage_url,
+                             duration: parseInt(info.duration),
+                             thumbnail: info.thumbnail
                          };
                     } else {
-                        const results = await play.search(line, { limit: 1 });
-                        if (results.length > 0) {
+                        const results = await ytSearch(line);
+                        if (results.videos.length > 0) {
+                            const video = results.videos[0];
                             songData = {
-                                title: results[0].title,
-                                url: results[0].url,
-                                duration: results[0].durationInSec,
-                                thumbnail: results[0].thumbnails[0].url
+                                title: video.title,
+                                url: video.url,
+                                duration: video.seconds,
+                                thumbnail: video.thumbnail
                             };
                         }
                     }
@@ -94,7 +123,7 @@ module.exports = {
                         }
                     }
                 } catch (e) {
-                    console.error(`Error loading track from playlist: ${line}`, e);
+                    logger.error(`[Command: Play] Error loading track from playlist: ${line}`, e);
                 }
             }
             
@@ -105,48 +134,56 @@ module.exports = {
         await message.reply(`🔎 Searching for **${query}**...`);
 
         try {
-            let song_info;
             let songs = [];
 
-            if (play.yt_validate(query) === 'video') {
-                song_info = await play.video_info(query);
-                songs.push({
-                    title: song_info.video_details.title,
-                    url: song_info.video_details.url,
-                    duration: song_info.video_details.durationInSec,
-                    thumbnail: song_info.video_details.thumbnails[0].url
-                });
-            } else if (play.yt_validate(query) === 'playlist') {
-                const playlist = await play.playlist_info(query);
-                const videos = await playlist.all_videos();
-                videos.forEach(video => {
+            // Verifica se è un URL valido di YouTube
+            if (isYouTubeURL(query)) {
+                logger.info(`[Command: Play] Query is a valid YouTube URL`);
+                try {
+                    const info = await getVideoInfo(query);
                     songs.push({
+                        title: info.title,
+                        url: info.webpage_url,
+                        duration: parseInt(info.duration),
+                        thumbnail: info.thumbnail
+                    });
+                } catch (e) {
+                    logger.error(`[Command: Play] Error getting video info with yt-dlp`, e);
+                    return message.channel.send('Could not load video info!');
+                }
+            } else {
+                // Se non è un URL, prova a cercare
+                logger.info(`[Command: Play] Performing search for: ${query}`);
+                
+                // Verifica se è una playlist URL (yt-search gestisce le liste se passiamo l'ID o l'URL, ma ytdl è meglio per i singoli)
+                // Per semplicità, usiamo yt-search per tutto ciò che non è un video diretto
+                const searchResult = await ytSearch(query);
+
+                if (searchResult.videos.length > 0) {
+                     // Se è una ricerca generica, prendiamo il primo video
+                     const video = searchResult.videos[0];
+                     songs.push({
                         title: video.title,
                         url: video.url,
-                        duration: video.durationInSec,
-                        thumbnail: video.thumbnails[0].url
+                        duration: video.seconds,
+                        thumbnail: video.thumbnail
                     });
-                });
-                await message.channel.send(`Added **${songs.length}** songs from playlist **${playlist.title}**`);
-            } else {
-                const search_results = await play.search(query, { limit: 1 });
-                if (search_results.length === 0) {
+                } else if (searchResult.lists && searchResult.lists.length > 0) {
+                    // Gestione base playlist da ricerca (non implementata profondamente qui per brevità, ma yt-search può trovarle)
+                    // Per ora fallback su video
+                    return message.channel.send('No video results found!');
+                } else {
                     return message.channel.send('No results found!');
                 }
-                song_info = search_results[0];
-                songs.push({
-                    title: song_info.title,
-                    url: song_info.url,
-                    duration: song_info.durationInSec,
-                    thumbnail: song_info.thumbnails[0].url
-                });
             }
 
             if (songs.length === 0) return;
 
+            logger.info(`[Command: Play] Adding ${songs.length} songs to queue`);
             songs.forEach(song => queue.songs.push(song));
 
             if (!queue.playing) {
+                logger.info(`[Command: Play] Queue was empty, starting playback immediately`);
                 player.playSong(message.guild.id, queue.songs[0]);
                 message.channel.send(`🎶 Now playing: **${queue.songs[0].title}**`);
             } else {
@@ -156,7 +193,7 @@ module.exports = {
             }
 
         } catch (error) {
-            console.error(error);
+            logger.error(`[Command: Play] Error processing request`, error);
             message.channel.send('There was an error trying to play that song!');
         }
     },
