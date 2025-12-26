@@ -110,6 +110,8 @@ module.exports = {
         try {
             logger.info(`[Player] Attempting to stream: ${song.title} (${song.url})`);
             
+            const potUrl = process.env.POT_URL || 'http://pot-provider:4444';
+
             // Arguments for yt-dlp
             const args = [
                 song.url,
@@ -121,7 +123,7 @@ module.exports = {
                 // --- INTEGRATION PATCH START ---
                 // Inject the POT Provider Configuration
                 // We use the Modern Syntax (youtubepot-bgutilhttp)
-                '--extractor-args', 'youtubepot-bgutilhttp:base_url=http://pot-provider:4444'
+                '--extractor-args', `youtubepot-bgutilhttp:base_url=${potUrl}`
                 // --- INTEGRATION PATCH END ---
             ];
 

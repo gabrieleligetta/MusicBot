@@ -14,7 +14,8 @@ const getVideoInfo = (url) => {
         // --- INTEGRATION PATCH START ---
         // Inject the POT Provider Configuration
         // We use the Modern Syntax (youtubepot-bgutilhttp)
-        command += ' --extractor-args "youtubepot-bgutilhttp:base_url=http://pot-provider:4444"';
+        const potUrl = process.env.POT_URL || 'http://pot-provider:4444';
+        command += ` --extractor-args "youtubepot-bgutilhttp:base_url=${potUrl}"`;
         // --- INTEGRATION PATCH END ---
 
         // Inject environment options (e.g. for PO Token plugin)

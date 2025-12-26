@@ -38,8 +38,10 @@ services:
       
     environment:
       - NODE_ENV=production
-      # Iniezione degli argomenti yt-dlp per utilizzare il plugin.
-      - YTDL_OPTIONS=--extractor-args "youtube:player_client=default,mweb;po_token=web+http://127.0.0.1:4416/get_pot"
+      # Define the URL for the code to use. 
+      # Since we use network_mode: service:bgutil-sidecar, we use localhost.
+      # And we must match the port defined in bgutil-sidecar (4416).
+      - POT_URL=http://127.0.0.1:4416
       
     volumes:
       # Persistenza del database
