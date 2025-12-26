@@ -2,48 +2,37 @@ version: '3.9'
 
 services:
   # ---------------------------------------------------------------------------
-  # SERVIZIO 1: Sidecar PO Token Provider (Implementazione Rust)
-  # Repository: jim60105/bgutil-ytdlp-pot-provider-rs
-  # Registry: GHCR (GitHub Container Registry)
+  # SERVIZIO 1: Sidecar Rust
   # ---------------------------------------------------------------------------
   bgutil-sidecar:
     image: ghcr.io/jim60105/bgutil-pot:latest
-    # Forza l'architettura AMD64 per compatibilità con Apple Silicon (via Rosetta)
-    platform: linux/amd64
     container_name: bgutil-sidecar
     restart: unless-stopped
     environment:
-      - RUST_LOG=info       # Livello di log per debug
-      - SERVER_PORT=4416    # Porta di ascolto standard per l'API
-    # Healthcheck rimosso perché 'curl' potrebbe mancare nell'immagine
-    # e l'endpoint corretto è probabilmente /ping, non /health.
+      - RUST_LOG=info
+      - SERVER_PORT=4416
 
   # ---------------------------------------------------------------------------
-  # SERVIZIO 2: MusicBot (Target Application)
+  # SERVIZIO 2: MusicBot (SCARICATO DA GHCR)
   # ---------------------------------------------------------------------------
   musicbot:
     container_name: musicbot
-    build: .
+    #  vvvvvvvvv MODIFICA IMPORTANTE vvvvvvvvv
+    # Sostituisci 'gabrieleligetta' col tuo username GitHub esatto (tutto minuscolo)
+    image: ghcr.io/gabrieleligetta/musicbot:latest
+    #  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    # RIMUOVI LA RIGA: build: .
     restart: unless-stopped
     
-    # CRITICO: Condivisione del namespace di rete con il sidecar.
-    # Questo permette al bot di raggiungere il provider su 'localhost'.
     network_mode: service:bgutil-sidecar
-    
-    # Dipendenza semplificata (senza controllo di salute)
     depends_on:
       - bgutil-sidecar
         
     env_file:
       - .env
-      
     environment:
-      # Iniezione degli argomenti yt-dlp per utilizzare il plugin.
-      # Configurazione per usare il provider locale (sidecar)
       - YTDL_OPTIONS=--extractor-args "youtube:player_client=default,mweb;po_token=web+http://127.0.0.1:4416/get_pot"
-      
     volumes:
       - ./database.sqlite:/usr/src/app/database.sqlite
       - ./Playlists:/usr/src/app/Playlists
-      # Se necessario persistere i cookie
       - ./cookies.json:/usr/src/app/cookies.json

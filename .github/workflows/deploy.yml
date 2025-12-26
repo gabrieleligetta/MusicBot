@@ -1,57 +1,80 @@
-name: Deploy to Google Cloud
+name: Build & Deploy to Google Cloud
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master" ] # Assicurati che sia 'master' o 'main'
+
+env:
+  REGISTRY: ghcr.io
+  # Usa il nome del repo corrente (es. gabrieleligetta/musicbot)
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  deploy:
+  # JOB 1: COSTRUISCI L'IMMAGINE E CARICALA SU GITHUB
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐳 Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+
+      - name: 🏗️ Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # JOB 2: COLLEGATI AL SERVER E SCARICA L'AGGIORNAMENTO
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    
     steps:
       - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@master
-        env:
-          BOT_ENV: ${{ secrets.SSH_ENV }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
-          envs: BOT_ENV
           script: |
             set -e
+            cd ~/musicbot-docker
             
-            # Definisci la cartella di destinazione
-            TARGET_DIR="/home/${{ secrets.SSH_USER }}/musicbot-docker"
-            REPO_URL="https://github.com/gabrieleligetta/musicbot.git"
+            # 1. Aggiorna il file docker-compose.yml (per avere la modifica 'image:')
+            git pull origin master
             
-            echo "📂 Target directory: $TARGET_DIR"
+            # 2. Login a GitHub Container Registry (usando il token segreto)
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            # Se la cartella non esiste, clona il repo
-            if [ ! -d "$TARGET_DIR" ]; then
-              echo "⚠️ Directory not found. Cloning repository..."
-              git clone "$REPO_URL" "$TARGET_DIR"
-            fi
+            # 3. Scarica la nuova immagine costruita da GitHub
+            echo "⬇️ Pulling new image..."
+            docker compose pull
             
-            # Entra nella cartella
-            cd "$TARGET_DIR"
+            # 4. Riavvia i container
+            echo "🔄 Restarting containers..."
+            docker compose up -d
             
-            # Crea/Aggiorna il file .env dal secret
-            echo "📝 Updating .env file..."
-            echo "$BOT_ENV" > .env
-            
-            # Scarica le modifiche
-            echo "⬇️ Pulling latest changes..."
-            git fetch origin master
-            git reset --hard origin/master
-            
-            # Ricostruisci e riavvia i container usando il file di produzione
-            echo "🔄 Rebuilding containers..."
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up -d --build
-            
-            # Pulisci le immagini vecchie
-            echo "🧹 Cleaning up..."
+            # 5. Pulizia
             docker image prune -f
-            
-            echo "✅ Deploy Success!"
+            echo "✅ Deploy Completato con Successo!"
