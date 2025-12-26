@@ -21,8 +21,20 @@ jobs:
           script: |
             set -e
             
-            # Vai nella cartella
-            cd ~/musicbot-docker
+            # Definisci la cartella di destinazione
+            TARGET_DIR="/home/${{ secrets.SSH_USER }}/musicbot-docker"
+            REPO_URL="https://github.com/gabrieleligetta/musicbot.git"
+            
+            echo "📂 Target directory: $TARGET_DIR"
+            
+            # Se la cartella non esiste, clona il repo
+            if [ ! -d "$TARGET_DIR" ]; then
+              echo "⚠️ Directory not found. Cloning repository..."
+              git clone "$REPO_URL" "$TARGET_DIR"
+            fi
+            
+            # Entra nella cartella
+            cd "$TARGET_DIR"
             
             # Crea/Aggiorna il file .env dal secret
             echo "📝 Updating .env file..."
@@ -30,7 +42,8 @@ jobs:
             
             # Scarica le modifiche
             echo "⬇️ Pulling latest changes..."
-            git pull origin master
+            git fetch origin master
+            git reset --hard origin/master
             
             # Ricostruisci e riavvia i container usando il file di produzione
             echo "🔄 Rebuilding containers..."
