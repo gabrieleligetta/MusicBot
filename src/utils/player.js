@@ -53,7 +53,8 @@ module.exports = {
             connection: null,
             volume: 100,
             playing: false,
-            loop: false // false, 'song', 'queue'
+            loop: false, // false, 'song', 'queue'
+            autoleaveTimer: null
         };
 
         // Log player state changes

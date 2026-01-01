@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./utils/db');
 const logger = require('./utils/logger');
+const player = require('./utils/player');
 const packageJson = require('../package.json');
 
 // --- DIAGNOSTICA AMBIENTE DOCKER ---
@@ -71,6 +72,44 @@ for (const folder of commandFolders) {
 client.once(Events.ClientReady, () => {
     logger.info(`Logged in as ${client.user.tag}!`);
     logger.info(`Loaded ${client.commands.size} commands.`);
+});
+
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    // Ignora se il bot non è coinvolto o se non è in un canale
+    const guildId = oldState.guild.id;
+    const queue = player.getQueue(guildId);
+    
+    if (!queue || !queue.connection) return;
+
+    // Ottieni il canale vocale dove si trova il bot
+    const botChannelId = queue.connection.joinConfig.channelId;
+    const botChannel = oldState.guild.channels.cache.get(botChannelId);
+
+    if (!botChannel) return;
+
+    // Conta i membri umani nel canale
+    const humanMembers = botChannel.members.filter(member => !member.user.bot);
+
+    if (humanMembers.size === 0) {
+        // Se non ci sono umani, avvia il timer se non è già attivo
+        if (!queue.autoleaveTimer) {
+            logger.info(`[AutoLeave] Channel empty in guild ${guildId}. Starting 60s timer.`);
+            queue.autoleaveTimer = setTimeout(() => {
+                logger.info(`[AutoLeave] Timer expired for guild ${guildId}. Leaving channel.`);
+                if (queue.connection) {
+                    queue.connection.destroy();
+                }
+                player.deleteQueue(guildId);
+            }, 60000); // 60 secondi
+        }
+    } else {
+        // Se c'è almeno un umano, cancella il timer se esiste
+        if (queue.autoleaveTimer) {
+            logger.info(`[AutoLeave] Human detected in guild ${guildId}. Cancelling timer.`);
+            clearTimeout(queue.autoleaveTimer);
+            queue.autoleaveTimer = null;
+        }
+    }
 });
 
 client.on(Events.MessageCreate, async message => {
