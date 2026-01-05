@@ -127,7 +127,7 @@ module.exports = {
         const queue = queues.get(guildId);
         if (!queue) return;
 
-        const potUrl = process.env.POT_URL || 'http://pot-provider:4444';
+        const potUrl = process.env.POT_URL || 'http://pot-provider:4416';
         const hasCookies = fs.existsSync('./cookies.json') && fs.statSync('./cookies.json').size > 0;
 
         const attempts = [];
@@ -183,11 +183,16 @@ module.exports = {
             logger.info(`[DEBUG] yt-dlp arguments: ${JSON.stringify(args)}`);
 
             const ytDlpProcess = spawn('yt-dlp', args);
+            
+            // Variabili per gestire il "falso inizio"
             let streamStarted = false;
+            let streamStartTime = 0;
+            const MIN_PLAY_TIME_MS = 5000; // Se muore prima di 5 secondi, è un fallimento
 
             const onReadable = () => {
                 if (streamStarted) return;
                 streamStarted = true;
+                streamStartTime = Date.now();
                 logger.info(`[Player] Stream started successfully (Strategy: ${attempt.name})`);
                 
                 const resource = createAudioResource(ytDlpProcess.stdout, {
@@ -203,8 +208,21 @@ module.exports = {
             };
 
             const onExit = (code) => {
-                if (!streamStarted) {
-                    logger.warn(`[Player] Strategy ${attempt.name} failed (Exit code ${code}). Retrying...`);
+                const playDuration = Date.now() - streamStartTime;
+                const wasShortPlay = streamStarted && playDuration < MIN_PLAY_TIME_MS;
+
+                if (!streamStarted || wasShortPlay) {
+                    if (wasShortPlay) {
+                        logger.warn(`[Player] Strategy ${attempt.name} died too quickly (${playDuration}ms). Treating as failure.`);
+                    } else {
+                        logger.warn(`[Player] Strategy ${attempt.name} failed to start (Exit code ${code}).`);
+                    }
+                    
+                    // Se siamo già in riproduzione ma fallisce subito, fermiamo il player per evitare rumore
+                    if (wasShortPlay) {
+                        queue.player.stop();
+                    }
+                    
                     tryPlay(attemptIndex + 1);
                 } else {
                     if (code !== 0 && code !== null) {
@@ -227,7 +245,10 @@ module.exports = {
 
             ytDlpProcess.stderr.on('data', (data) => {
                 const msg = data.toString();
-                logger.info(`[yt-dlp STDERR]: ${msg}`);
+                // Ignora i log di progresso di yt-dlp per non intasare la console
+                if (!msg.includes('[download]')) {
+                    logger.info(`[yt-dlp STDERR]: ${msg}`);
+                }
             });
         };
 

@@ -1,76 +1,89 @@
-## Unofficial JMusicBot update with built-in Docker script (Forked from: https://github.com/jagrosh/MusicBot)
+# Discord MusicBot 🎵
 
-> [!IMPORTANT]
-> This version has a built-in Docker script ([youtube-trusted-session-generator](https://github.com/iv-org/youtube-trusted-session-generator)) that enters po_token and visitor_data automatically into the _tokens.txt_ (file creates with first launch) file each time the bot is launched. 
-> For proper operation you need **Docker** installed and **_running_** on your device.
+A robust, Dockerized Discord Music Bot built with Node.js, designed to bypass YouTube's latest restrictions using a dedicated PO Token Provider sidecar.
 
-<img width="887" alt="Zrzut ekranu 2024-12-26 o 18 57 45" src="https://github.com/user-attachments/assets/e66d1fb3-3301-4c98-a44b-d521c0940dac" />
+## 🚀 Features
 
+*   **YouTube Playback**: High-quality audio streaming using `yt-dlp`.
+*   **Anti-Blocking System**:
+    *   **Strategy 1**: Uses `cookies.json` (if provided) for authenticated access.
+    *   **Strategy 2**: Automatically falls back to a **PO Token Provider** (bgutil-pot) if cookies fail or are missing.
+*   **Dockerized**: Easy deployment with Docker Compose.
+*   **Playlist Support**: Queue management, looping, and shuffling.
 
-> [!TIP]
-> If Docker doesn't work, enter PO_TOKEN and VISITOR_DATA manually to tokens.txt
+## 🛠️ Prerequisites
+
+*   [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/install/) installed on your machine.
+*   A Discord Bot Token (get it from the [Discord Developer Portal](https://discord.com/developers/applications)).
+
+## ⚙️ Configuration
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <your-repo-url>
+    cd MusicBot
+    ```
+
+2.  **Environment Variables:**
+    Create a `.env` file in the root directory. You can copy the example:
+    ```bash
+    cp .env.example .env
+    ```
+    
+    Edit `.env` and fill in your details:
+    ```env
+    DISCORD_TOKEN=your_discord_bot_token_here
+    CLIENT_ID=your_discord_client_id_here
+    GUILD_ID=your_discord_guild_id_here (optional, for faster command registration)
+    POT_URL=http://pot-provider:4416
+    NODE_ENV=production
+    ```
+
+3.  **Cookies (Optional but Recommended):**
+    To play age-restricted videos or improve stability, export your YouTube cookies:
+    *   Install a browser extension like "Get cookies.txt LOCALLY" (ensure you export as **JSON**).
+    *   Go to YouTube and ensure you are logged in.
+    *   Export cookies.
+    *   Save the file as `cookies.json` in the project root.
+
+## ▶️ How to Run
+
+### Local / Production (Docker Compose)
+
+The easiest way to run the bot is using Docker Compose. This spins up both the MusicBot and the PO Token Provider.
+
+```bash
+docker compose up -d
 ```
-ytpotoken=PO_TOKEN_HERE
-ytvisitordata=VISITOR_DATA_HERE
-```
 
-<img align="right" src="https://i.imgur.com/zrE80HY.png" height="200" width="200">
+*   The bot will start and automatically connect to the PO Token Provider.
+*   Logs can be viewed with: `docker compose logs -f`
 
-# JMusicBot
+### Manual / Development
 
-[![Downloads](https://img.shields.io/github/downloads/jagrosh/MusicBot/total.svg)](https://github.com/jagrosh/MusicBot/releases/latest)
-[![Stars](https://img.shields.io/github/stars/jagrosh/MusicBot.svg)](https://github.com/jagrosh/MusicBot/stargazers)
-[![Release](https://img.shields.io/github/release/jagrosh/MusicBot.svg)](https://github.com/jagrosh/MusicBot/releases/latest)
-[![License](https://img.shields.io/github/license/jagrosh/MusicBot.svg)](https://github.com/jagrosh/MusicBot/blob/master/LICENSE)
-[![Discord](https://discordapp.com/api/guilds/147698382092238848/widget.png)](https://discord.gg/0p9LSGoRLu6Pet0k)<br>
-[![CircleCI](https://dl.circleci.com/status-badge/img/gh/jagrosh/MusicBot/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/jagrosh/MusicBot/tree/master)
-[![Build and Test](https://github.com/jagrosh/MusicBot/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jagrosh/MusicBot/actions/workflows/build-and-test.yml)
-[![CodeFactor](https://www.codefactor.io/repository/github/jagrosh/musicbot/badge)](https://www.codefactor.io/repository/github/jagrosh/musicbot)
+If you want to run the bot locally without Docker (Node.js required), you still need the PO Token Provider running.
 
-A cross-platform Discord music bot with a clean interface, and that is easy to set up and run yourself!
+1.  Start the provider:
+    ```bash
+    docker run -d -p 4416:4416 ghcr.io/jim60105/bgutil-pot:latest
+    ```
+2.  Install dependencies and start the bot:
+    ```bash
+    npm install
+    npm start
+    ```
 
-[![Setup](http://i.imgur.com/VvXYp5j.png)](https://jmusicbot.com/setup)
+## 🏗️ Architecture
 
-## Features
-  * Easy to run (just make sure Java is installed, and run!)
-  * Fast loading of songs
-  * No external keys needed (besides a Discord Bot token)
-  * Smooth playback
-  * Server-specific setup for the "DJ" role that can moderate the music
-  * Clean and beautiful menus
-  * Supports many sites, including Youtube, Soundcloud, and more
-  * Supports many online radio/streams
-  * Supports local files
-  * Playlist support (both web/youtube, and local)
+This project uses a microservices approach to handle YouTube's anti-bot protections:
 
-## Supported sources and formats
-JMusicBot supports all sources and formats supported by [lavaplayer](https://github.com/sedmelluq/lavaplayer#supported-formats):
-### Sources
-  * YouTube
-  * SoundCloud
-  * Bandcamp
-  * Vimeo
-  * Twitch streams
-  * Local files
-  * HTTP URLs
-### Formats
-  * MP3
-  * FLAC
-  * WAV
-  * Matroska/WebM (AAC, Opus or Vorbis codecs)
-  * MP4/M4A (AAC codec)
-  * OGG streams (Opus, Vorbis and FLAC codecs)
-  * AAC streams
-  * Stream playlists (M3U and PLS)
+*   **MusicBot**: The main Node.js application handling Discord commands and audio streaming.
+*   **pot-provider**: A sidecar service (running `bgutil-pot`) that generates valid "Proof of Origin" (PO) tokens.
 
-## Example
-![Loading Example...](https://i.imgur.com/kVtTKvS.gif)
+The bot implements a **Smart Fallback Strategy**:
+1.  It first tries to stream using **Cookies** (if available).
+2.  If that fails (or cookies are invalid), it automatically retries using the **PO Token**.
 
-## Setup
-Please see the [Setup Page](https://jmusicbot.com/setup) to run this bot yourself!
+## 🤝 Contributing
 
-## Questions/Suggestions/Bug Reports
-**Please read the [Issues List](https://github.com/jagrosh/MusicBot/issues) before suggesting a feature**. If you have a question, need troubleshooting help, or want to brainstorm a new feature, please start a [Discussion](https://github.com/jagrosh/MusicBot/discussions). If you'd like to suggest a feature or report a reproducible bug, please open an [Issue](https://github.com/jagrosh/MusicBot/issues) on this repository. If you like this bot, be sure to add a star to the libraries that make this possible: [**JDA**](https://github.com/DV8FromTheWorld/JDA) and [**lavaplayer**](https://github.com/sedmelluq/lavaplayer)!
-
-## Editing
-This bot (and the source code here) might not be easy to edit for inexperienced programmers. The main purpose of having the source public is to show the capabilities of the libraries, to allow others to understand how the bot works, and to allow those knowledgeable about java, JDA, and Discord bot development to contribute. There are many requirements and dependencies required to edit and compile it, and there will not be support provided for people looking to make changes on their own. Instead, consider making a feature request (see the above section). If you choose to make edits, please do so in accordance with the Apache 2.0 License.
+Feel free to open issues or submit pull requests!
