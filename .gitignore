@@ -7,3 +7,4 @@ nb*.xml
 .idea
 node_modules/
 .env
+cookies.json
