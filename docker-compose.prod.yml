@@ -1,54 +1,53 @@
-
 services:
   # ---------------------------------------------------------------------------
-  # SERVIZIO 1: Sidecar PO Token Provider (Implementazione Rust)
-  # Repository: jim60105/bgutil-ytdlp-pot-provider-rs
-  # Registry: GHCR (GitHub Container Registry)
+  # SERVIZIO 1: POT Token Provider (Server)
   # ---------------------------------------------------------------------------
-  bgutil-sidecar:
+  pot-provider:
     image: ghcr.io/jim60105/bgutil-pot:latest
-    # In produzione su server Linux (probabilmente AMD64), non forziamo la piattaforma
-    # a meno che non sia necessario. Se il server è ARM, l'immagine deve supportarlo.
-    # platform: linux/amd64 
-    container_name: bgutil-sidecar
+    container_name: yt-dlp-pot-provider
     restart: always
+    
+    # RIMOSSO ENTRYPOINT MANUALE (Causava crash)
+    # Usiamo le variabili d'ambiente per configurare il server
     environment:
       - RUST_LOG=info
+      - SERVER_HOST=0.0.0.0
       - SERVER_PORT=4416
+    
+    # IN PRODUZIONE: NON esportiamo le porte all'esterno per sicurezza.
+    # Il bot ci parlerà tramite la rete interna docker.
+    expose:
+      - "4416"
+      
+    networks:
+      - musicbot_network
 
   # ---------------------------------------------------------------------------
-  # SERVIZIO 2: MusicBot (Target Application)
+  # SERVIZIO 2: MusicBot
   # ---------------------------------------------------------------------------
   musicbot:
     container_name: musicbot
     image: ghcr.io/gabrieleligetta/musicbot:latest
     restart: always
-    
-    # CRITICO: Condivisione del namespace di rete con il sidecar.
-    network_mode: service:bgutil-sidecar
-    
     depends_on:
-      - bgutil-sidecar
-        
+      - pot-provider
     env_file:
       - .env
-      
     environment:
       - NODE_ENV=production
-      # Define the URL for the code to use. 
-      # Since we use network_mode: service:bgutil-sidecar, we use localhost.
-      # And we must match the port defined in bgutil-sidecar (4416).
-      - POT_URL=http://127.0.0.1:4416
-      
+      # Ora corrisponde esattamente alla configurazione locale
+      - POT_URL=http://pot-provider:4416
     volumes:
-      # Persistenza del database
       - ./database.sqlite:/usr/src/app/database.sqlite
-      # Persistenza delle playlist
       - ./Playlists:/usr/src/app/Playlists
-      # Persistenza dei cookie (opzionale)
       - ./cookies.json:/usr/src/app/cookies.json
-      # AGGIUNGI QUESTA RIGA: Salva la cache di yt-dlp per non riscaricarla sempre
       - yt-dlp-cache:/root/.cache/yt-dlp
+    networks:
+      - musicbot_network
+
+networks:
+  musicbot_network:
+    driver: bridge
 
 volumes:
   yt-dlp-cache:

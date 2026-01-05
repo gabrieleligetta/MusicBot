@@ -15,7 +15,11 @@ const getVideoInfo = (url) => {
         // Inject the POT Provider Configuration
         // We use the Modern Syntax (youtubepot-bgutilhttp)
         const potUrl = process.env.POT_URL || 'http://pot-provider:4444';
+        logger.info(`[DEBUG-INFO] Using POT_URL for info: ${potUrl}`);
+        
         command += ` --extractor-args "youtubepot-bgutilhttp:base_url=${potUrl}"`;
+        // Force web client which supports cookies
+        command += ' --extractor-args "youtube:player_client=web"';
         // --- INTEGRATION PATCH END ---
 
         // Inject environment options (e.g. for PO Token plugin)
@@ -27,15 +31,18 @@ const getVideoInfo = (url) => {
             const stats = fs.statSync('./cookies.json');
             if (stats.isFile() && stats.size > 0) {
                 command += ' --cookies ./cookies.json';
+                logger.info(`[DEBUG-INFO] Found cookies.json, adding to info command.`);
             }
         }
         
         // Escape double quotes in URL just in case, though usually URLs don't have them
         command += ` "${url.replace(/"/g, '\\"')}"`;
 
+        logger.info(`[DEBUG-INFO] Executing info command: ${command}`);
+
         exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
             if (error) {
-                // logger.error(`[yt-dlp info error] ${stderr}`); // Optional logging
+                logger.error(`[yt-dlp info error] ${stderr}`);
                 reject(error);
                 return;
             }

@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon --ignore logs/ --ignore database.sqlite src/index.js"
   },
   "dependencies": {
     "discord.js": "^14.16.3",

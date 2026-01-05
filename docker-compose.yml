@@ -1,20 +1,22 @@
-
-
 services:
   # ---------------------------------------------------------------------------
   # SERVIZIO 1: POT Token Provider (Server)
   # ---------------------------------------------------------------------------
   pot-provider:
-    image: ghcr.io/jim60105/yt-dlp:pot
+    image: ghcr.io/jim60105/bgutil-pot:latest
     container_name: yt-dlp-pot-provider
     restart: always
-    # CRITICAL: Override the default entrypoint to run the bgutil server
-    # We bind to 0.0.0.0 to allow access from other containers
-    entrypoint: ["bgutil-pot", "server", "--bind", "0.0.0.0:4444"]
-    ports:
-      - "4444:4444"
+    # RIMUOVIAMO l'entrypoint manuale che causava l'errore
+    # entrypoint: ...  <-- CANCELLA QUESTA RIGA
+
+    # Usiamo le variabili d'ambiente ufficiali per configurare host e porta
     environment:
       - RUST_LOG=info
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=4416
+
+    ports:
+      - "4416:4416"
     networks:
       - musicbot_network
 
@@ -25,11 +27,14 @@ services:
     container_name: musicbot
     # Usa l'immagine costruita localmente o da GHCR, ma assicurati che abbia le dipendenze pip aggiornate
     image: ghcr.io/gabrieleligetta/musicbot:latest
+    build: .
     restart: unless-stopped
     depends_on:
       - pot-provider
     env_file:
       - .env
+    environment:
+      - POT_URL=http://pot-provider:4416
     volumes:
       - ./database.sqlite:/usr/src/app/database.sqlite
       - ./Playlists:/usr/src/app/Playlists

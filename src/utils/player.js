@@ -2,6 +2,7 @@ const { createAudioPlayer, createAudioResource, NoSubscriberBehavior, AudioPlaye
 const { spawn } = require('child_process');
 const fs = require('fs');
 const logger = require('./logger');
+const http = require('http'); // Added for debug check
 
 const queues = new Map();
 
@@ -37,6 +38,24 @@ function parseArgs(str) {
     }
     if (current.length > 0) args.push(current);
     return args;
+}
+
+// Helper function to check POT provider connectivity
+function checkPotProvider(url) {
+    return new Promise((resolve) => {
+        try {
+            const req = http.get(url + '/health', (res) => {
+                resolve(res.statusCode === 200);
+            });
+            req.on('error', () => resolve(false));
+            req.setTimeout(1000, () => {
+                req.destroy();
+                resolve(false);
+            });
+        } catch (e) {
+            resolve(false);
+        }
+    });
 }
 
 module.exports = {
@@ -108,85 +127,111 @@ module.exports = {
         const queue = queues.get(guildId);
         if (!queue) return;
 
-        try {
-            logger.info(`[Player] Attempting to stream: ${song.title} (${song.url})`);
-            
-            const potUrl = process.env.POT_URL || 'http://pot-provider:4444';
+        const potUrl = process.env.POT_URL || 'http://pot-provider:4444';
+        const hasCookies = fs.existsSync('./cookies.json') && fs.statSync('./cookies.json').size > 0;
 
-            // Arguments for yt-dlp
+        const attempts = [];
+        if (hasCookies) {
+            attempts.push({ type: 'cookies', name: 'Cookies Only' });
+        }
+        attempts.push({ type: 'pot', name: 'PO Token Only' });
+
+        const tryPlay = (attemptIndex) => {
+            if (attemptIndex >= attempts.length) {
+                logger.error(`[Player] All attempts failed for song: ${song.title}`);
+                const failedSong = queue.songs.shift();
+                if (queue.loop === 'queue') {
+                    queue.songs.push(failedSong);
+                }
+
+                if (queue.songs.length > 0) {
+                    module.exports.playSong(guildId, queue.songs[0]);
+                } else {
+                    queue.playing = false;
+                }
+                return;
+            }
+
+            const attempt = attempts[attemptIndex];
+            logger.info(`[Player] Attempting to stream: ${song.title} (Strategy: ${attempt.name})`);
+
             const args = [
                 song.url,
                 '-o', '-',
                 '-q',
                 '-f', 'bestaudio',
                 '--no-playlist',
-                '--limit-rate', '100K',
-                // Abilita il download dei componenti per risolvere la challenge di YouTube
-                '--remote-components', 'ejs:github',
-                // --- INTEGRATION PATCH START ---
-                // Inject the POT Provider Configuration
-                // We use the Modern Syntax (youtubepot-bgutilhttp)
-                '--extractor-args', `youtubepot-bgutilhttp:base_url=${potUrl}`
-                // --- INTEGRATION PATCH END ---
+                '--limit-rate', '100K'
             ];
 
-            // Inject environment options (e.g. for PO Token plugin)
+            if (attempt.type === 'pot') {
+                 args.push(
+                    '--remote-components', 'ejs:github',
+                    '--extractor-args', `youtubepot-bgutilhttp:base_url=${potUrl}`,
+                    '--extractor-args', 'youtube:player_client=web'
+                 );
+            } else if (attempt.type === 'cookies') {
+                 args.push('--cookies', './cookies.json');
+            }
+
             if (process.env.YTDL_OPTIONS) {
                 const extraArgs = parseArgs(process.env.YTDL_OPTIONS);
                 args.push(...extraArgs);
                 logger.info(`[Player] Injected YTDL_OPTIONS: ${process.env.YTDL_OPTIONS}`);
             }
 
-            // Check for cookies.json
-            if (fs.existsSync('./cookies.json')) {
-                const stats = fs.statSync('./cookies.json');
-                if (stats.isFile() && stats.size > 0) {
-                    args.push('--cookies', './cookies.json');
-                }
-            }
+            logger.info(`[DEBUG] yt-dlp arguments: ${JSON.stringify(args)}`);
 
             const ytDlpProcess = spawn('yt-dlp', args);
-            
-            logger.info(`[Player] Stream created with yt-dlp`);
+            let streamStarted = false;
 
-            ytDlpProcess.stderr.on('data', (data) => {
-                // Only log if it's not just a warning or info that slips through -q
-                logger.error(`[yt-dlp Error]: ${data.toString()}`);
-            });
+            const onReadable = () => {
+                if (streamStarted) return;
+                streamStarted = true;
+                logger.info(`[Player] Stream started successfully (Strategy: ${attempt.name})`);
+                
+                const resource = createAudioResource(ytDlpProcess.stdout, {
+                    inputType: StreamType.Arbitrary,
+                    inlineVolume: true,
+                    highWaterMark: 1 << 20
+                });
+                resource.volume.setVolume(queue.volume / 100);
 
-            ytDlpProcess.on('close', (code) => {
-                if (code !== 0 && code !== null) {
-                     logger.warn(`[yt-dlp] Process exited with code ${code}`);
+                queue.player.play(resource);
+                queue.playing = true;
+                logger.info(`[Player] Resource played on audio player`);
+            };
+
+            const onExit = (code) => {
+                if (!streamStarted) {
+                    logger.warn(`[Player] Strategy ${attempt.name} failed (Exit code ${code}). Retrying...`);
+                    tryPlay(attemptIndex + 1);
+                } else {
+                    if (code !== 0 && code !== null) {
+                         logger.warn(`[yt-dlp] Process exited with code ${code}`);
+                    } else {
+                        logger.info(`[yt-dlp] Process exited successfully (code 0)`);
+                    }
+                }
+            };
+
+            ytDlpProcess.on('error', (err) => {
+                logger.error(`[yt-dlp] Spawn error: ${err.message}`);
+                if (!streamStarted) {
+                     tryPlay(attemptIndex + 1);
                 }
             });
-            
-            const resource = createAudioResource(ytDlpProcess.stdout, {
-                inputType: StreamType.Arbitrary,
-                inlineVolume: true,
-                // Aumenta il buffer a 1MB (default è molto basso, circa 64kb)
-                // Questo aiuta a prevenire i salti se la CPU o la rete hanno un picco
-                highWaterMark: 1 << 20
+
+            ytDlpProcess.stdout.once('readable', onReadable);
+            ytDlpProcess.once('exit', onExit);
+
+            ytDlpProcess.stderr.on('data', (data) => {
+                const msg = data.toString();
+                logger.info(`[yt-dlp STDERR]: ${msg}`);
             });
-            logger.info(`[Player] Audio resource created`);
+        };
 
-            resource.volume.setVolume(queue.volume / 100);
-
-            queue.player.play(resource);
-            queue.playing = true;
-            logger.info(`[Player] Resource played on audio player`);
-        } catch (error) {
-            logger.error(`[Player] Error playing song: ${song.title}`, error);
-            const failedSong = queue.songs.shift();
-            if (queue.loop === 'queue') {
-                queue.songs.push(failedSong);
-            }
-
-            if (queue.songs.length > 0) {
-                module.exports.playSong(guildId, queue.songs[0]);
-            } else {
-                queue.playing = false;
-            }
-        }
+        tryPlay(0);
     },
 
     connectToChannel: async (channel) => {
